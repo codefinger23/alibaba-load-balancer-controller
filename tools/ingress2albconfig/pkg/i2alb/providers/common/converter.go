@@ -165,12 +165,16 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 	var errors field.ErrorList
 	var albIngresses []*networkingv1.Ingress
 
-	listenersByName := map[string][]albconfig.ListenerSpec{}
+	listenersByName := map[string]map[string]albconfig.ListenerSpec{}
 
 	for _, rg := range a.ruleGroups {
 		albconfigKey := rg.ingressClass
 		for _, ing := range rg.ingresses {
-			listenersByName[albconfigKey] = append(listenersByName[albconfigKey], albconfig.ListenerSpec{Port: intstr.FromInt(80), Protocol: "HTTP"})
+			if listenersByName[albconfigKey] == nil {
+				listenersByName[albconfigKey] = map[string]albconfig.ListenerSpec{
+					"80": {Port: intstr.FromInt(80), Protocol: "HTTP"},
+				}
+			}
 			options := &i2alb.AlbImplement{
 				AliasTls: false,
 			}
@@ -181,7 +185,7 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 				}
 			}
 			if options.AliasTls {
-				listenersByName[albconfigKey] = append(listenersByName[albconfigKey], albconfig.ListenerSpec{Port: intstr.FromInt(443), Protocol: "HTTPS"})
+				listenersByName[albconfigKey]["443"] = albconfig.ListenerSpec{Port: intstr.FromInt(443), Protocol: "HTTPS"}
 			}
 			albIngress, errs := rg.convertAlbIngress(&ing, options)
 			if len(errs) > 0 {
