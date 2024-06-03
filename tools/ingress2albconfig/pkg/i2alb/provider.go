@@ -19,7 +19,7 @@ package i2alb
 import (
 	"context"
 
-	v1 "k8s.io/alibaba-load-balancer-controller/pkg/apis/alibabacloud/v1"
+	"k8s.io/alibaba-load-balancer-controller/ingress2albconfig/pkg/i2alb/albconfig"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -79,7 +79,7 @@ type AlbImplement struct {
 
 // GatewayResources contains all Gateway-API objects.
 type AlbResources struct {
-	AlbConfigs     []*v1.AlbConfig
+	AlbConfigs     []*albconfig.AlbConfig
 	IngressClasses []networkingv1.IngressClass
 	Ingresses      map[types.NamespacedName]*networkingv1.Ingress
 }

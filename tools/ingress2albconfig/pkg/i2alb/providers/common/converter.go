@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	i2alb "k8s.io/alibaba-load-balancer-controller/ingress2albconfig/pkg/i2alb"
-	v1 "k8s.io/alibaba-load-balancer-controller/pkg/apis/alibabacloud/v1"
+	"k8s.io/alibaba-load-balancer-controller/ingress2albconfig/pkg/i2alb/albconfig"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,6 +72,7 @@ func ToAlbIngress(ingresses []networkingv1.Ingress) (i2alb.AlbResources, field.E
 				},
 			},
 		}
+		ic.SetGroupVersionKind(networkingv1.SchemeGroupVersion.WithKind("IngressClass"))
 		ingressClasses = append(ingressClasses, ic)
 	}
 
@@ -160,16 +161,16 @@ func UnMatchTLS(tls []networkingv1.IngressTLS, rule *networkingv1.IngressRule) b
 	return true
 }
 
-func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []*v1.AlbConfig, field.ErrorList) {
+func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []*albconfig.AlbConfig, field.ErrorList) {
 	var errors field.ErrorList
 	var albIngresses []*networkingv1.Ingress
 
-	listenersByName := map[string][]v1.ListenerSpec{}
+	listenersByName := map[string][]albconfig.ListenerSpec{}
 
 	for _, rg := range a.ruleGroups {
 		albconfigKey := rg.ingressClass
 		for _, ing := range rg.ingresses {
-			listenersByName[albconfigKey] = append(listenersByName[albconfigKey], v1.ListenerSpec{Port: intstr.FromInt(80), Protocol: "HTTP"})
+			listenersByName[albconfigKey] = append(listenersByName[albconfigKey], albconfig.ListenerSpec{Port: intstr.FromInt(80), Protocol: "HTTP"})
 			options := &i2alb.AlbImplement{
 				AliasTls: false,
 			}
@@ -180,7 +181,7 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 				}
 			}
 			if options.AliasTls {
-				listenersByName[albconfigKey] = append(listenersByName[albconfigKey], v1.ListenerSpec{Port: intstr.FromInt(443), Protocol: "HTTPS"})
+				listenersByName[albconfigKey] = append(listenersByName[albconfigKey], albconfig.ListenerSpec{Port: intstr.FromInt(443), Protocol: "HTTPS"})
 			}
 			albIngress, errs := rg.convertAlbIngress(&ing, options)
 			if len(errs) > 0 {
@@ -209,31 +210,33 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 		albIngresses = append(albIngresses, albIngress)
 	}
 
-	albconfigByKey := map[string]*v1.AlbConfig{}
+	albconfigByKey := map[string]*albconfig.AlbConfig{}
 	for albconfigKey, listeners := range listenersByName {
-		albconfig := albconfigByKey[albconfigKey]
-		if albconfig == nil {
-			albconfig = &v1.AlbConfig{
+		albc := albconfigByKey[albconfigKey]
+		if albc == nil {
+			albc = &albconfig.AlbConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: albconfigKey,
 				},
-				Spec: v1.AlbConfigSpec{
-					LoadBalancer: &v1.LoadBalancerSpec{
+				Spec: albconfig.AlbConfigSpec{
+					LoadBalancer: &albconfig.LoadBalancerSpec{
 						Name:    albconfigKey,
 						Edition: "Standard",
-						Tags: []v1.Tag{
+						Tags: []albconfig.Tag{
 							{
 								Key:   "converted/ingress2albconfig",
 								Value: "true",
 							},
 						},
 					},
-					Listeners: []*v1.ListenerSpec{},
+					Listeners: []*albconfig.ListenerSpec{},
 				},
 			}
+			albc.SetGroupVersionKind(AlbConfigGVK)
+			albconfigByKey[albconfigKey] = albc
 		}
 		for _, listener := range listeners {
-			albconfig.Spec.Listeners = append(albconfig.Spec.Listeners, &v1.ListenerSpec{
+			albc.Spec.Listeners = append(albc.Spec.Listeners, &albconfig.ListenerSpec{
 				Port:     listener.Port,
 				Protocol: listener.Protocol,
 			})
@@ -241,7 +244,7 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 
 	}
 
-	var albconfigs []*v1.AlbConfig
+	var albconfigs []*albconfig.AlbConfig
 	for _, alb := range albconfigByKey {
 		albconfigs = append(albconfigs, alb)
 	}
