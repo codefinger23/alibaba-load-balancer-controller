@@ -35,7 +35,7 @@ import (
 // ToAlb converts the received ingresses to i2alb.AlbResources,
 // without taking into consideration any provider specific logic.
 func ToAlbIngress(ingresses []networkingv1.Ingress) (i2alb.AlbResources, field.ErrorList) {
-	aggregator := ingressAggregator{ruleGroups: map[ruleGroupKey]*ingressRuleGroup{}}
+	aggregator := ingressAggregator{ingressGroups: map[ingressClassKey][]ingressRuleGroup{}}
 
 	var errs field.ErrorList
 	for _, ingress := range ingresses {
@@ -91,10 +91,10 @@ var (
 	}
 )
 
-type ruleGroupKey string
+type ingressClassKey string
 
 type ingressAggregator struct {
-	ruleGroups      map[ruleGroupKey]*ingressRuleGroup
+	ingressGroups   map[ingressClassKey][]ingressRuleGroup
 	defaultBackends []ingressDefaultBackend
 }
 
@@ -103,7 +103,7 @@ type ingressRuleGroup struct {
 	name         string
 	ingressClass string
 	tls          []networkingv1.IngressTLS
-	ingresses    []networkingv1.Ingress
+	ingress      networkingv1.Ingress
 }
 
 type ingressDefaultBackend struct {
@@ -123,22 +123,21 @@ func (a *ingressAggregator) addIngress(ingress networkingv1.Ingress) {
 	} else {
 		ingressClass = ingress.Name
 	}
-	rgKey := ruleGroupKey(ingressClass)
-	rg, ok := a.ruleGroups[rgKey]
+	rgsKey := ingressClassKey(acov(ingressClass))
+	rgs, ok := a.ingressGroups[rgsKey]
 	if !ok {
-		rg = &ingressRuleGroup{
-			namespace:    ingress.Namespace,
-			name:         ingress.Name,
-			ingressClass: ingressClass,
-			ingresses:    []networkingv1.Ingress{},
-		}
-		a.ruleGroups[rgKey] = rg
+		rgs = []ingressRuleGroup{}
 	}
-	if len(ingress.Spec.TLS) > 0 {
-		rg.tls = append(rg.tls, ingress.Spec.TLS...)
+	rg := ingressRuleGroup{
+		namespace:    ingress.Namespace,
+		name:         ingress.Name,
+		ingressClass: ingressClass,
 	}
+	rgs = append(rgs, rg)
+	a.ingressGroups[rgsKey] = rgs
 
-	rg.ingresses = append(rg.ingresses, ingress)
+	rg.tls = ingress.Spec.TLS
+	rg.ingress = ingress
 
 	if ingress.Spec.DefaultBackend != nil {
 		a.defaultBackends = append(a.defaultBackends, ingressDefaultBackend{
@@ -167,9 +166,9 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 
 	listenersByName := map[string]map[string]albconfig.ListenerSpec{}
 
-	for _, rg := range a.ruleGroups {
-		albconfigKey := rg.ingressClass
-		for _, ing := range rg.ingresses {
+	for _, rgs := range a.ingressGroups {
+		for _, rg := range rgs {
+			albconfigKey := rg.ingressClass
 			if listenersByName[albconfigKey] == nil {
 				listenersByName[albconfigKey] = map[string]albconfig.ListenerSpec{
 					"80": {Port: intstr.FromInt(80), Protocol: "HTTP"},
@@ -178,8 +177,8 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 			options := &i2alb.AlbImplement{
 				AliasTls: false,
 			}
-			for _, rule := range ing.Spec.Rules {
-				if UnMatchTLS(ing.Spec.TLS, &rule) {
+			for _, rule := range rg.ingress.Spec.Rules {
+				if UnMatchTLS(rg.ingress.Spec.TLS, &rule) {
 					options.AliasTls = true
 					break
 				}
@@ -187,7 +186,7 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 			if options.AliasTls {
 				listenersByName[albconfigKey]["443"] = albconfig.ListenerSpec{Port: intstr.FromInt(443), Protocol: "HTTPS"}
 			}
-			albIngress, errs := rg.convertAlbIngress(&ing, options)
+			albIngress, errs := rg.convertAlbIngress(&rg.ingress, options)
 			if len(errs) > 0 {
 				errors = append(errors, errs...)
 				continue
@@ -393,4 +392,9 @@ func (db *ingressDefaultBackend) convertAlbIngress(options *i2alb.AlbImplement) 
 	albIngress.Annotations["alb.ingress.kubernetes.io/listen-ports"] = string(listenPortsStr)
 
 	return albIngress, errors
+}
+
+func acov(key string) string {
+	prefix := "alb__"
+	return fmt.Sprintf("%s%s", prefix, key)
 }
