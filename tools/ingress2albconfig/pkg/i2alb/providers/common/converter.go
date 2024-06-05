@@ -258,15 +258,12 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 
 func (rg *ingressRuleGroup) convertAlbIngress(ing *networkingv1.Ingress, options *i2alb.AlbImplement) (*networkingv1.Ingress, field.ErrorList) {
 
-	annotations := ing.DeepCopyObject().(metav1.Object).GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
+	name := fmt.Sprintf("from_%s", rg.name)
 	albIngress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        rg.name,
+			Name:        name,
 			Namespace:   rg.namespace,
-			Annotations: annotations,
+			Annotations: map[string]string{},
 		},
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{},
@@ -342,7 +339,7 @@ func (db *ingressDefaultBackend) convertAlbIngress(options *i2alb.AlbImplement) 
 			fmt.Sprintf("not support non-service defaultBackend: %s/%s", db.namespace, db.name)))
 		return nil, errors
 	}
-	name := fmt.Sprintf("%s__default", db.name)
+	name := fmt.Sprintf("from_%s__default", db.name)
 	pathType := networkingv1.PathTypePrefix
 	albIngress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
