@@ -228,6 +228,14 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 					LoadBalancer: &albconfig.LoadBalancerSpec{
 						Name:    albconfigKey,
 						Edition: "Standard",
+						ZoneMappings: []albconfig.ZoneMapping{
+							{
+								VSwitchId: "vsw-xxx",
+							},
+							{
+								VSwitchId: "vsw-xxx",
+							},
+						},
 						Tags: []albconfig.Tag{
 							{
 								Key:   "converted/ingress2albconfig",
