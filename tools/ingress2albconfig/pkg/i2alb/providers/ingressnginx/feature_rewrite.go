@@ -28,7 +28,7 @@ func rewriteFeature(ingresses []networkingv1.Ingress, albResources *i2alb.AlbRes
 }
 
 func translateAlbRewrite(path string) string {
-	re := regexp.MustCompile(`$(\d+)`)
+	re := regexp.MustCompile(`\$(\d+)`)
 	result := re.ReplaceAllString(path, `${$1}`)
 	return result
 }
