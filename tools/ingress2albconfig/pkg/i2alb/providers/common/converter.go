@@ -260,10 +260,9 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 
 func (rg *ingressRuleGroup) convertAlbIngress(ing *networkingv1.Ingress, options *i2alb.AlbImplement) (*networkingv1.Ingress, field.ErrorList) {
 
-	name := fmt.Sprintf("from_%s", rg.name)
 	albIngress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
+			Name:        rg.name,
 			Namespace:   rg.namespace,
 			Annotations: map[string]string{},
 		},
