@@ -8,15 +8,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-const rewriteAnnotaions = "nginx.ingress.kubernetes.io/rewrite-target"
+const rewriteAnnotaionsNginx = "nginx.ingress.kubernetes.io/rewrite-target"
+const rewriteAnnotaionsAlb = "alb.ingress.kubernetes.io/rewrite-target"
 
 func rewriteFeature(ingresses []networkingv1.Ingress, albResources *i2alb.AlbResources) field.ErrorList {
 
 	for _, ing := range albResources.Ingresses {
 		for k, v := range ing.Annotations {
-			if k == rewriteAnnotaions {
+			if k == rewriteAnnotaionsNginx {
 				newValue := translateAlbRewrite(v)
 				ing.Annotations[k] = newValue
+				delete(ing.Annotations, rewriteAnnotaionsNginx)
+				ing.Annotations[rewriteAnnotaionsAlb] = newValue
 				break
 			}
 		}
