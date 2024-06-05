@@ -133,11 +133,11 @@ func (a *ingressAggregator) addIngress(ingress networkingv1.Ingress) {
 		name:         ingress.Name,
 		ingressClass: ingressClass,
 	}
-	rgs = append(rgs, rg)
-	a.ingressGroups[rgsKey] = rgs
 
 	rg.tls = ingress.Spec.TLS
 	rg.ingress = ingress
+	rgs = append(rgs, rg)
+	a.ingressGroups[rgsKey] = rgs
 
 	if ingress.Spec.DefaultBackend != nil {
 		a.defaultBackends = append(a.defaultBackends, ingressDefaultBackend{
@@ -145,6 +145,7 @@ func (a *ingressAggregator) addIngress(ingress networkingv1.Ingress) {
 			namespace:    ingress.Namespace,
 			ingressClass: ingressClass,
 			backend:      *ingress.Spec.DefaultBackend,
+			ingress:      ingress,
 		})
 	}
 }
@@ -178,7 +179,7 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 				AliasTls: false,
 			}
 			for _, rule := range rg.ingress.Spec.Rules {
-				if UnMatchTLS(rg.ingress.Spec.TLS, &rule) {
+				if !UnMatchTLS(rg.ingress.Spec.TLS, &rule) {
 					options.AliasTls = true
 					break
 				}
@@ -200,7 +201,7 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 			AliasTls: false,
 		}
 		for _, rule := range db.ingress.Spec.Rules {
-			if UnMatchTLS(db.ingress.Spec.TLS, &rule) {
+			if !UnMatchTLS(db.ingress.Spec.TLS, &rule) {
 				options.AliasTls = true
 				break
 			}
@@ -258,6 +259,9 @@ func (a *ingressAggregator) toAlbIngressAndConfig() ([]*networkingv1.Ingress, []
 func (rg *ingressRuleGroup) convertAlbIngress(ing *networkingv1.Ingress, options *i2alb.AlbImplement) (*networkingv1.Ingress, field.ErrorList) {
 
 	annotations := ing.DeepCopyObject().(metav1.Object).GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
 	albIngress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        rg.name,
@@ -338,10 +342,11 @@ func (db *ingressDefaultBackend) convertAlbIngress(options *i2alb.AlbImplement) 
 			fmt.Sprintf("not support non-service defaultBackend: %s/%s", db.namespace, db.name)))
 		return nil, errors
 	}
+	name := fmt.Sprintf("%s__default", db.name)
 	pathType := networkingv1.PathTypePrefix
 	albIngress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        db.name,
+			Name:        name,
 			Namespace:   db.namespace,
 			Annotations: map[string]string{},
 		},
