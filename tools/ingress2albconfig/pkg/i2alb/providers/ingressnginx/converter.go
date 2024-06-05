@@ -18,6 +18,7 @@ func newConverter() *converter {
 	return &converter{
 		featureParsers: []i2alb.FeatureParser{
 			rewriteFeature,
+			redirectFeature,
 		},
 	}
 }
