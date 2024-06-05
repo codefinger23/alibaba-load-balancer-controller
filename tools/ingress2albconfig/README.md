@@ -6,5 +6,6 @@ Ingress2albconfig helps translate ALB ingress
 
 ``` 
 nginx.ingress.kubernetes.io/rewrite-target
+nginx.ingress.kubernetes.io/ssl-redirect
 
 ```
