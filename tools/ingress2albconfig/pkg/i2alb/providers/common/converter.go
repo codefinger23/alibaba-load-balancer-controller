@@ -128,10 +128,12 @@ func (a *ingressAggregator) addIngress(ingress networkingv1.Ingress) {
 	if !ok {
 		rgs = []ingressRuleGroup{}
 	}
+	newIngressClassName := fmt.Sprintf("from_%s", ingressClass)
+	newIngressName := fmt.Sprintf("from_%s", ingress.Name)
 	rg := ingressRuleGroup{
 		namespace:    ingress.Namespace,
-		name:         ingress.Name,
-		ingressClass: ingressClass,
+		name:         newIngressName,
+		ingressClass: newIngressClassName,
 	}
 
 	rg.tls = ingress.Spec.TLS
@@ -141,9 +143,9 @@ func (a *ingressAggregator) addIngress(ingress networkingv1.Ingress) {
 
 	if ingress.Spec.DefaultBackend != nil {
 		a.defaultBackends = append(a.defaultBackends, ingressDefaultBackend{
-			name:         ingress.Name,
+			name:         newIngressName,
 			namespace:    ingress.Namespace,
-			ingressClass: ingressClass,
+			ingressClass: newIngressClassName,
 			backend:      *ingress.Spec.DefaultBackend,
 			ingress:      ingress,
 		})
@@ -339,7 +341,7 @@ func (db *ingressDefaultBackend) convertAlbIngress(options *i2alb.AlbImplement) 
 			fmt.Sprintf("not support non-service defaultBackend: %s/%s", db.namespace, db.name)))
 		return nil, errors
 	}
-	name := fmt.Sprintf("from_%s__default", db.name)
+	name := fmt.Sprintf("%s__default", db.name)
 	pathType := networkingv1.PathTypePrefix
 	albIngress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
