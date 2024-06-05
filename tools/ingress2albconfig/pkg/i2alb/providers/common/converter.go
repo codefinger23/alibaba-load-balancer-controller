@@ -19,7 +19,6 @@ package common
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	i2alb "k8s.io/alibaba-load-balancer-controller/ingress2albconfig/pkg/i2alb"
 	"k8s.io/alibaba-load-balancer-controller/ingress2albconfig/pkg/i2alb/albconfig"
@@ -309,9 +308,9 @@ func (rg *ingressRuleGroup) convertAlbIngress(ing *networkingv1.Ingress, options
 				newPath.Path = path.Path
 				newPath.PathType = path.PathType
 			case networkingv1.PathTypeImplementationSpecific:
-				normalizedPath := strings.TrimSuffix(path.Path, "/")
-				newPath.Path = normalizedPath + "/*"
-				newPath.PathType = path.PathType
+				newPath.Path = path.Path
+				prefix := networkingv1.PathType("Prefix")
+				newPath.PathType = &prefix
 			default:
 				err := field.Invalid(field.NewPath("spec", "rule", "http", "path", "pathType"), path.PathType, fmt.Sprintf("unsupported path match type: %s", *path.PathType))
 				errors = append(errors, err)
