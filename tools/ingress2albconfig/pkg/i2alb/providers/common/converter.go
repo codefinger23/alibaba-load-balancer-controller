@@ -272,7 +272,7 @@ func (rg *ingressRuleGroup) convertAlbIngress(ing *networkingv1.Ingress, options
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        rg.name,
 			Namespace:   rg.namespace,
-			Annotations: map[string]string{},
+			Annotations: annocov(ing.Annotations),
 		},
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{},
@@ -354,7 +354,7 @@ func (db *ingressDefaultBackend) convertAlbIngress(options *i2alb.AlbImplement) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Namespace:   db.namespace,
-			Annotations: map[string]string{},
+			Annotations: annocov(db.ingress.Annotations),
 		},
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{
@@ -408,4 +408,23 @@ func (db *ingressDefaultBackend) convertAlbIngress(options *i2alb.AlbImplement) 
 func acov(key string) string {
 	prefix := "alb__"
 	return fmt.Sprintf("%s%s", prefix, key)
+}
+
+func annocov(annotations map[string]string) map[string]string {
+	newAnnotations := map[string]string{}
+	ignoreAnnotationKeys := []string{
+		"kubectl.kubernetes.io/last-applied-configuration",
+	}
+	for k, v := range annotations {
+		contain := false
+		for _, ignoreKey := range ignoreAnnotationKeys {
+			if k == ignoreKey {
+				contain = true
+			}
+		}
+		if !contain {
+			newAnnotations[k] = v
+		}
+	}
+	return newAnnotations
 }
